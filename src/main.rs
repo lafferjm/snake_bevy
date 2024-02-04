@@ -23,6 +23,17 @@ enum Direction {
     RIGHT,
 }
 
+#[derive(States, Default, Debug, Hash, Eq, PartialEq, Clone, Copy)]
+enum GameState {
+    #[default]
+    MainMenu,
+    Playing,
+    GameOver,
+}
+
+#[derive(Component)]
+struct GameText {}
+
 fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
     let window = window_query.get_single().unwrap();
     commands.spawn(Camera2dBundle {
@@ -89,9 +100,7 @@ fn spawn_food(mut commands: Commands, window_query: Query<&Window, With<PrimaryW
                 anchor: Anchor::TopLeft,
                 ..default()
             },
-            transform: Transform::from_xyz(
-                x * 20., y * 20., 0.
-            ),
+            transform: Transform::from_xyz(x * 20., y * 20., 0.),
             ..default()
         },
         Food {},
@@ -131,11 +140,15 @@ fn move_snake(
 
             prev_translation = prev.translation;
         }
-
     }
 }
 
-fn handle_food_eaten(mut commands: Commands, mut food_query: Query<&mut Transform, (With<Food>, Without<Snake>)>, mut snake_query: Query<&mut Transform, (With<Snake>, Without<Food>)>, window_query: Query<&Window, With<PrimaryWindow>>) {
+fn handle_food_eaten(
+    mut commands: Commands,
+    mut food_query: Query<&mut Transform, (With<Food>, Without<Snake>)>,
+    mut snake_query: Query<&mut Transform, (With<Snake>, Without<Food>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+) {
     let mut food = food_query.get_single_mut().unwrap();
     let snake = snake_query.get_single_mut().unwrap();
     let window = window_query.get_single().unwrap();
@@ -155,11 +168,7 @@ fn handle_food_eaten(mut commands: Commands, mut food_query: Query<&mut Transfor
                     anchor: Anchor::TopLeft,
                     ..default()
                 },
-                transform: Transform::from_xyz(
-                    snake.translation.x,
-                    snake.translation.y,
-                    0.
-                ),
+                transform: Transform::from_xyz(snake.translation.x, snake.translation.y, 0.),
                 ..default()
             },
             SnakeSegment {},
@@ -190,6 +199,61 @@ fn handle_input(
     }
 }
 
+fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        TextBundle::from_section(
+            "Snake",
+            TextStyle {
+                font: asset_server.load("fonts/Harabara.ttf"),
+                font_size: 64.,
+                ..default()
+            },
+        )
+        .with_text_alignment(TextAlignment::Center)
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(200.),
+            left: Val::Px(340.),
+            ..default()
+        }),
+        GameText {},
+    ));
+
+    commands.spawn((
+        TextBundle::from_section(
+            "Press <Space> to play!",
+            TextStyle {
+                font: asset_server.load("fonts/Harabara.ttf"),
+                font_size: 32.,
+                ..default()
+            },
+        )
+        .with_text_alignment(TextAlignment::Center)
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(255.),
+            left: Val::Px(285.),
+            ..default()
+        }),
+        GameText {},
+    ));
+}
+
+fn cleanup_main_menu(mut commands: Commands, mut text_query: Query<Entity, With<GameText>>) {
+    for text in &mut text_query {
+        commands.entity(text).despawn();
+    }
+}
+
+fn handle_main_menu_input(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        next_state.set(GameState::Playing);
+    }
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -211,7 +275,19 @@ fn main() {
             }),
             bevy_framepace::FramepacePlugin,
         ))
-        .add_systems(Startup, (spawn_camera, spawn_snake, spawn_food, set_framerate))
-        .add_systems(Update, (move_snake, handle_input, handle_food_eaten))
+        .add_state::<GameState>()
+        .add_systems(Startup, (spawn_camera, set_framerate))
+        .add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
+        .add_systems(OnExit(GameState::MainMenu), cleanup_main_menu)
+        .add_systems(OnEnter(GameState::Playing), (spawn_snake, spawn_food))
+        .add_systems(
+            Update,
+            (
+                move_snake.run_if(in_state(GameState::Playing)),
+                handle_input.run_if(in_state(GameState::Playing)),
+                handle_food_eaten.run_if(in_state(GameState::Playing)),
+                handle_main_menu_input.run_if(in_state(GameState::MainMenu)),
+            ),
+        )
         .run();
 }
