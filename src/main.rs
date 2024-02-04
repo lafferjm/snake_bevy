@@ -3,9 +3,13 @@ use bevy::sprite::Anchor;
 use bevy::window::{PresentMode, PrimaryWindow, WindowTheme};
 use bevy_framepace;
 use bevy_framepace::Limiter;
+use rand::Rng;
 
 #[derive(Component)]
 struct Snake {}
+
+#[derive(Component)]
+struct Food {}
 
 #[derive(Component)]
 struct SnakeSegment {}
@@ -68,6 +72,30 @@ fn spawn_snake(mut commands: Commands, window_query: Query<&Window, With<Primary
             SnakeSegment {},
         ));
     }
+}
+
+fn spawn_food(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
+    let window = window_query.get_single().unwrap();
+
+    let mut rng = rand::thread_rng();
+    let x = rng.gen_range(0..(window.width() / 20.) as i32) as f32;
+    let y = rng.gen_range(0..(window.height() / 20.) as i32) as f32;
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgb(255., 0., 0.),
+                custom_size: Some(Vec2::new(20., 20.)),
+                anchor: Anchor::TopLeft,
+                ..default()
+            },
+            transform: Transform::from_xyz(
+                x * 20., y * 20., 0.
+            ),
+            ..default()
+        },
+        Food {},
+    ));
 }
 
 fn move_snake(
@@ -151,7 +179,7 @@ fn main() {
             }),
             bevy_framepace::FramepacePlugin,
         ))
-        .add_systems(Startup, (spawn_camera, spawn_snake, set_framerate))
+        .add_systems(Startup, (spawn_camera, spawn_snake, spawn_food, set_framerate))
         .add_systems(Update, (move_snake, handle_input))
         .run();
 }
