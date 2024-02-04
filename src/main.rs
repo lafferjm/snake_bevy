@@ -1,5 +1,8 @@
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
 use bevy::window::{PresentMode, PrimaryWindow, WindowTheme};
+use bevy_framepace;
+use bevy_framepace::Limiter;
 
 #[derive(Component)]
 struct Snake {}
@@ -21,6 +24,10 @@ fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Primar
     });
 }
 
+fn set_framerate(mut settings: ResMut<bevy_framepace::FramepaceSettings>,) {
+    settings.limiter = Limiter::from_framerate(30.);
+}
+
 fn spawn_snake(mut commands: Commands, window_query: Query<&Window, With<PrimaryWindow>>) {
     let window = window_query.get_single().unwrap();
 
@@ -29,6 +36,7 @@ fn spawn_snake(mut commands: Commands, window_query: Query<&Window, With<Primary
             sprite: Sprite {
                 color: Color::rgb(0., 255., 0.),
                 custom_size: Some(Vec2::new(20., 20.)),
+                anchor: Anchor::TopLeft,
                 ..default()
             },
             transform: Transform::from_xyz(window.width() / 2., window.height() / 2., 0.),
@@ -39,7 +47,10 @@ fn spawn_snake(mut commands: Commands, window_query: Query<&Window, With<Primary
     ));
 }
 
-fn move_snake(mut transform_query: Query<&mut Transform, With<Snake>>, direction_query: Query<&Direction, With<Snake>>) {
+fn move_snake(
+    mut transform_query: Query<&mut Transform, With<Snake>>,
+    direction_query: Query<&Direction, With<Snake>>,
+) {
     let direction = direction_query.get_single().unwrap();
 
     if let Ok(mut transform) = transform_query.get_single_mut() {
@@ -61,7 +72,10 @@ fn move_snake(mut transform_query: Query<&mut Transform, With<Snake>>, direction
     }
 }
 
-fn handle_input(keyboard_input: Res<Input<KeyCode>>, mut snake_query: Query<&mut Direction, With<Snake>>) {
+fn handle_input(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut snake_query: Query<&mut Direction, With<Snake>>,
+) {
     if let Ok(mut direction) = snake_query.get_single_mut() {
         if keyboard_input.just_pressed(KeyCode::Left) && *direction != Direction::RIGHT {
             *direction = Direction::LEFT;
@@ -84,22 +98,25 @@ fn handle_input(keyboard_input: Res<Input<KeyCode>>, mut snake_query: Query<&mut
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Snake".into(),
-                resolution: (800., 600.).into(),
-                present_mode: PresentMode::AutoVsync,
-                window_theme: Some(WindowTheme::Dark),
-                enabled_buttons: bevy::window::EnabledButtons {
-                    maximize: false,
-                    ..Default::default()
-                },
-                visible: true,
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Snake".into(),
+                    resolution: (800., 600.).into(),
+                    present_mode: PresentMode::AutoVsync,
+                    window_theme: Some(WindowTheme::Dark),
+                    enabled_buttons: bevy::window::EnabledButtons {
+                        maximize: false,
+                        ..Default::default()
+                    },
+                    visible: true,
+                    ..default()
+                }),
                 ..default()
             }),
-            ..default()
-        }))
-        .add_systems(Startup, (spawn_camera, spawn_snake))
+            bevy_framepace::FramepacePlugin,
+        ))
+        .add_systems(Startup, (spawn_camera, spawn_snake, set_framerate))
         .add_systems(Update, (move_snake, handle_input))
         .run();
 }
