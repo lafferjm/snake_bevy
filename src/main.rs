@@ -135,6 +135,38 @@ fn move_snake(
     }
 }
 
+fn handle_food_eaten(mut commands: Commands, mut food_query: Query<&mut Transform, (With<Food>, Without<Snake>)>, mut snake_query: Query<&mut Transform, (With<Snake>, Without<Food>)>, window_query: Query<&Window, With<PrimaryWindow>>) {
+    let mut food = food_query.get_single_mut().unwrap();
+    let snake = snake_query.get_single_mut().unwrap();
+    let window = window_query.get_single().unwrap();
+
+    if food.translation == snake.translation {
+        let mut rng = rand::thread_rng();
+        let x = rng.gen_range(0..(window.width() / 20.) as i32) as f32;
+        let y = rng.gen_range(0..(window.height() / 20.) as i32) as f32;
+        food.translation.x = x * 20.;
+        food.translation.y = y * 20.;
+
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(0., 255., 0.),
+                    custom_size: Some(Vec2::new(20., 20.)),
+                    anchor: Anchor::TopLeft,
+                    ..default()
+                },
+                transform: Transform::from_xyz(
+                    snake.translation.x,
+                    snake.translation.y,
+                    0.
+                ),
+                ..default()
+            },
+            SnakeSegment {},
+        ));
+    }
+}
+
 fn handle_input(
     keyboard_input: Res<Input<KeyCode>>,
     mut snake_query: Query<&mut Direction, With<Snake>>,
@@ -180,6 +212,6 @@ fn main() {
             bevy_framepace::FramepacePlugin,
         ))
         .add_systems(Startup, (spawn_camera, spawn_snake, spawn_food, set_framerate))
-        .add_systems(Update, (move_snake, handle_input))
+        .add_systems(Update, (move_snake, handle_input, handle_food_eaten))
         .run();
 }
