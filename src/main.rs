@@ -114,33 +114,37 @@ fn move_snake(
 ) {
     let direction = direction_query.get_single().unwrap();
 
-    if let Ok(mut transform) = transform_query.get_single_mut() {
-        let current_head_position = transform.translation;
+    if *direction != Direction::NONE {
+        if let Ok(mut transform) = transform_query.get_single_mut() {
+            let current_head_position = transform.translation;
 
-        if *direction == Direction::UP {
-            transform.translation += Vec3::new(0., 20., 0.);
-        }
+            if *direction == Direction::UP {
+                transform.translation += Vec3::new(0., 20., 0.);
+            }
 
-        if *direction == Direction::DOWN {
-            transform.translation += Vec3::new(0., -20., 0.);
-        }
+            if *direction == Direction::DOWN {
+                transform.translation += Vec3::new(0., -20., 0.);
+            }
 
-        if *direction == Direction::LEFT {
-            transform.translation += Vec3::new(-20., 0., 0.);
-        }
+            if *direction == Direction::LEFT {
+                transform.translation += Vec3::new(-20., 0., 0.);
+            }
 
-        if *direction == Direction::RIGHT {
-            transform.translation += Vec3::new(20., 0., 0.);
-        }
+            if *direction == Direction::RIGHT {
+                transform.translation += Vec3::new(20., 0., 0.);
+            }
 
-        let mut prev_translation = current_head_position;
-        for mut segment in segment_query.iter_mut() {
-            let prev = segment.clone();
-            segment.translation = prev_translation;
+            let mut prev_translation = current_head_position;
+            for mut segment in segment_query.iter_mut() {
+                let prev = segment.clone();
+                segment.translation = prev_translation;
 
-            prev_translation = prev.translation;
+                prev_translation = prev.translation;
+            }
         }
     }
+
+
 }
 
 fn handle_food_eaten(
@@ -254,6 +258,44 @@ fn handle_main_menu_input(
     }
 }
 
+fn check_game_over(
+    snake_query: Query<&mut Transform, (With<Snake>, Without<SnakeSegment>)>,
+    segment_query: Query<&mut Transform, (With<SnakeSegment>, Without<Snake>)>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    let window = window_query.get_single().unwrap();
+    if let Ok(snake) = snake_query.get_single() {
+        let x = snake.translation.x;
+        let y = snake.translation.y;
+
+        if x < 0. || x > window.width() || y < 0. || y > window.height() {
+            next_state.set(GameState::GameOver);
+        }
+
+        for segment in &segment_query {
+            if segment.translation == snake.translation {
+                next_state.set(GameState::GameOver);
+                break;
+            }
+        }
+    }
+}
+
+fn cleanup_game(mut commands: Commands, mut snake_query: Query<Entity, With<Snake>>, mut segments_query: Query<Entity, With<SnakeSegment>>, mut food_query: Query<Entity, With<Food>>) {
+    for snake in &mut snake_query {
+        commands.entity(snake).despawn();
+    }
+
+    for segment in &mut segments_query {
+        commands.entity(segment).despawn();
+    }
+
+    for food in &mut food_query {
+        commands.entity(food).despawn();
+    }
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -280,13 +322,16 @@ fn main() {
         .add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
         .add_systems(OnExit(GameState::MainMenu), cleanup_main_menu)
         .add_systems(OnEnter(GameState::Playing), (spawn_snake, spawn_food))
+        .add_systems(OnExit(GameState::Playing), cleanup_game)
         .add_systems(
             Update,
             (
+                handle_main_menu_input.run_if(in_state(GameState::MainMenu)),
+
                 move_snake.run_if(in_state(GameState::Playing)),
                 handle_input.run_if(in_state(GameState::Playing)),
                 handle_food_eaten.run_if(in_state(GameState::Playing)),
-                handle_main_menu_input.run_if(in_state(GameState::MainMenu)),
+                check_game_over.run_if(in_state(GameState::Playing))
             ),
         )
         .run();
