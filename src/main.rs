@@ -249,12 +249,58 @@ fn cleanup_main_menu(mut commands: Commands, mut text_query: Query<Entity, With<
     }
 }
 
-fn handle_main_menu_input(
+fn handle_menu_input(
     keyboard_input: Res<Input<KeyCode>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Space) {
         next_state.set(GameState::Playing);
+    }
+}
+
+fn setup_game_over_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        TextBundle::from_section(
+            "Game Over",
+            TextStyle {
+                font: asset_server.load("fonts/Harabara.ttf"),
+                font_size: 64.,
+                ..default()
+            },
+        )
+            .with_text_alignment(TextAlignment::Center)
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                top: Val::Px(200.),
+                left: Val::Px(285.),
+                ..default()
+            }),
+        GameText {},
+    ));
+
+    commands.spawn((
+        TextBundle::from_section(
+            "Press <Space> to play!",
+            TextStyle {
+                font: asset_server.load("fonts/Harabara.ttf"),
+                font_size: 32.,
+                ..default()
+            },
+        )
+            .with_text_alignment(TextAlignment::Center)
+            .with_style(Style {
+                position_type: PositionType::Absolute,
+                top: Val::Px(255.),
+                left: Val::Px(285.),
+                ..default()
+            }),
+        GameText {},
+    ));
+}
+
+fn cleanup_game_over_menu(mut commands: Commands, mut text_query: Query<Entity, With<GameText>>) {
+    for text in &mut text_query {
+        commands.entity(text).despawn();
     }
 }
 
@@ -323,10 +369,13 @@ fn main() {
         .add_systems(OnExit(GameState::MainMenu), cleanup_main_menu)
         .add_systems(OnEnter(GameState::Playing), (spawn_snake, spawn_food))
         .add_systems(OnExit(GameState::Playing), cleanup_game)
+        .add_systems(OnEnter(GameState::GameOver), setup_game_over_menu)
+        .add_systems(OnExit(GameState::GameOver), cleanup_game_over_menu)
         .add_systems(
             Update,
             (
-                handle_main_menu_input.run_if(in_state(GameState::MainMenu)),
+                handle_menu_input.run_if(in_state(GameState::MainMenu)),
+                handle_menu_input.run_if(in_state(GameState::GameOver)),
 
                 move_snake.run_if(in_state(GameState::Playing)),
                 handle_input.run_if(in_state(GameState::Playing)),
