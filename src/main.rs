@@ -7,6 +7,9 @@ use bevy_framepace::Limiter;
 #[derive(Component)]
 struct Snake {}
 
+#[derive(Component)]
+struct SnakeSegment {}
+
 #[derive(Component, PartialEq)]
 enum Direction {
     NONE,
@@ -24,7 +27,7 @@ fn spawn_camera(mut commands: Commands, window_query: Query<&Window, With<Primar
     });
 }
 
-fn set_framerate(mut settings: ResMut<bevy_framepace::FramepaceSettings>,) {
+fn set_framerate(mut settings: ResMut<bevy_framepace::FramepaceSettings>) {
     settings.limiter = Limiter::from_framerate(30.);
 }
 
@@ -45,15 +48,38 @@ fn spawn_snake(mut commands: Commands, window_query: Query<&Window, With<Primary
         Snake {},
         Direction::NONE,
     ));
+
+    for i in 1..3 {
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(0., 255., 0.),
+                    custom_size: Some(Vec2::new(20., 20.)),
+                    anchor: Anchor::TopLeft,
+                    ..default()
+                },
+                transform: Transform::from_xyz(
+                    window.width() / 2.,
+                    window.height() / 2. - (20. * i as f32),
+                    0.,
+                ),
+                ..default()
+            },
+            SnakeSegment {},
+        ));
+    }
 }
 
 fn move_snake(
-    mut transform_query: Query<&mut Transform, With<Snake>>,
+    mut transform_query: Query<&mut Transform, (With<Snake>, Without<SnakeSegment>)>,
     direction_query: Query<&Direction, With<Snake>>,
+    mut segment_query: Query<&mut Transform, (With<SnakeSegment>, Without<Snake>)>,
 ) {
     let direction = direction_query.get_single().unwrap();
 
     if let Ok(mut transform) = transform_query.get_single_mut() {
+        let current_head_position = transform.translation;
+
         if *direction == Direction::UP {
             transform.translation += Vec3::new(0., 20., 0.);
         }
@@ -69,6 +95,15 @@ fn move_snake(
         if *direction == Direction::RIGHT {
             transform.translation += Vec3::new(20., 0., 0.);
         }
+
+        let mut prev_translation = current_head_position;
+        for mut segment in segment_query.iter_mut() {
+            let prev = segment.clone();
+            segment.translation = prev_translation;
+
+            prev_translation = prev.translation;
+        }
+
     }
 }
 
